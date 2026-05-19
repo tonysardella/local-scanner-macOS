@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Mac Scanner</title>
+  <style>
+    :root {
+      --bg: #0f1419; --panel: #1a2027; --panel-2: #232b35;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --critical: #f85149; --high: #ff7b72; --medium: #f0883e;
+      --low: #d2a8ff; --info: #79c0ff; --ok: #3fb950;
+      --border: #30363d;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
+    header { padding: 24px 32px; border-bottom: 1px solid var(--border);
+             background: linear-gradient(180deg, #161b22 0%, var(--bg) 100%); }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+    .container { max-width: 980px; margin: 0 auto; padding: 24px 32px 60px; }
+
+    .card { background: var(--panel); border: 1px solid var(--border);
+            border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { margin: 0 0 12px; font-size: 16px; }
+    .info-banner { background: rgba(88,166,255,0.08); border-color: rgba(88,166,255,0.35); }
+    .info-banner strong { color: var(--accent); }
+
+    .scan-grid { display: grid;
+                 grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                 gap: 10px; margin-bottom: 14px; }
+    .scan-opt { display: flex; gap: 10px; align-items: flex-start;
+                padding: 12px; background: var(--panel-2);
+                border: 1px solid var(--border); border-radius: 6px;
+                cursor: pointer; }
+    .scan-opt:hover { border-color: #444c56; }
+    .scan-opt input[type=checkbox] { margin-top: 3px; }
+    .scan-opt .label { font-size: 13.5px; font-weight: 600; }
+    .scan-opt .desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+    input[type=text] { width: 100%; background: #0d1117; color: var(--text);
+                       border: 1px solid var(--border); border-radius: 6px;
+                       padding: 10px 12px; font-size: 14px;
+                       font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    label.field { display: block; color: var(--muted); font-size: 13px;
+                  margin: 4px 0 6px; }
+
+    button { background: var(--panel-2); color: var(--text);
+             border: 1px solid var(--border); padding: 10px 18px;
+             border-radius: 6px; cursor: pointer; font-size: 14px; }
+    button.primary { background: var(--accent); color: #0f1419;
+                     border-color: var(--accent); font-weight: 600; }
+    button.primary:hover { background: #79b8ff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .summary { display: grid;
+               grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+               gap: 10px; margin-bottom: 16px; }
+    .stat { background: var(--panel-2); padding: 14px; border-radius: 6px;
+            border: 1px solid var(--border); text-align: center; }
+    .stat .num { font-size: 24px; font-weight: 700; }
+    .stat .label { color: var(--muted); font-size: 11px;
+                   text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+    .category { margin-top: 20px; }
+    .category h3 { margin: 0 0 10px; font-size: 14px;
+                   color: var(--muted); text-transform: uppercase;
+                   letter-spacing: 0.6px; }
+
+    .finding { border: 1px solid var(--border); border-radius: 6px;
+               padding: 12px 14px; margin-bottom: 8px; background: var(--panel-2); }
+    .finding-head { display: flex; justify-content: space-between;
+                    align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .finding-title { font-weight: 600; font-size: 14px; }
+    .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .evidence { background: #0d1117; padding: 8px 10px; border-radius: 4px;
+                margin-top: 8px; font-family: ui-monospace, monospace;
+                font-size: 12.5px; color: var(--muted); white-space: pre-wrap;
+                word-break: break-word; }
+    .remediation { margin-top: 8px; font-size: 13px; color: var(--ok); }
+    .remediation::before { content: "→ "; color: var(--muted); }
+
+    .severity { font-size: 11px; font-weight: 700; padding: 3px 8px;
+                border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .severity.CRITICAL { background: rgba(248,81,73,0.18); color: var(--critical);
+                         border: 1px solid rgba(248,81,73,0.4); }
+    .severity.HIGH     { background: rgba(255,123,114,0.18); color: var(--high);
+                         border: 1px solid rgba(255,123,114,0.4); }
+    .severity.MEDIUM   { background: rgba(240,136,62,0.18); color: var(--medium);
+                         border: 1px solid rgba(240,136,62,0.4); }
+    .severity.LOW      { background: rgba(210,168,255,0.18); color: var(--low);
+                         border: 1px solid rgba(210,168,255,0.4); }
+    .severity.INFO     { background: rgba(121,192,255,0.12); color: var(--info);
+                         border: 1px solid rgba(121,192,255,0.35); }
+
+    .ok { color: var(--ok); } .err { color: var(--critical); }
+    .loading { color: var(--muted); font-style: italic; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Local Mac Scanner</h1>
+    <p>Read-only audit of your own computer: secrets in files, open ports, security config, pending updates.</p>
+  </header>
+
+  <div class="container">
+    <div class="card info-banner">
+      <strong>Read-only.</strong>
+      This tool only inspects your system. It never modifies settings or files. All commands are hardcoded and run locally.
+    </div>
+
+    <div class="card">
+      <h2>1. Choose scans</h2>
+      <div class="scan-grid">
+        <label class="scan-opt"><input type="checkbox" data-scan="secrets" checked />
+          <div><div class="label">Secrets in files</div>
+               <div class="desc">Find API keys, tokens, and private keys in a folder you choose</div></div></label>
+        <label class="scan-opt"><input type="checkbox" data-scan="ports" checked />
+          <div><div class="label">Open network ports</div>
+               <div class="desc">List listening TCP/UDP ports and the process behind each</div></div></label>
+        <label class="scan-opt"><input type="checkbox" data-scan="config" checked />
+          <div><div class="label">Security configuration</div>
+               <div class="desc">FileVault, SIP, GateKeeper, firewall, auto-login, SSH</div></div></label>
+        <label class="scan-opt"><input type="checkbox" data-scan="updates" />
+          <div><div class="label">Pending updates</div>
+               <div class="desc">macOS updates + outdated Homebrew packages (slower)</div></div></label>
+      </div>
+
+      <label class="field" for="path">Folder to scan for secrets (used only when Secrets is checked):</label>
+      <input id="path" type="text" placeholder="~/Projects" value="~/Projects" autocomplete="off" />
+
+      <div style="margin-top: 14px;">
+        <button class="primary" id="scanBtn" onclick="runScan()">Run selected scans</button>
+        <span id="status" class="loading" style="margin-left: 12px;"></span>
+      </div>
+    </div>
+
+    <div id="results"></div>
+  </div>
+
+  <footer>Read-only · Localhost only · Reports redact secret values to first/last 4 chars.</footer>
+
+  <script>
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function selectedScans() {
+      return Array.from(document.querySelectorAll('input[data-scan]'))
+                  .filter(c => c.checked).map(c => c.dataset.scan);
+    }
+    async function runScan() {
+      const btn = document.getElementById('scanBtn');
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      const scans = selectedScans();
+      const path = document.getElementById('path').value.trim();
+
+      if (!scans.length) {
+        status.textContent = 'Pick at least one scan.';
+        status.className = 'err';
+        return;
+      }
+
+      results.innerHTML = '';
+      btn.disabled = true;
+      status.textContent = 'Scanning… this may take a moment for updates / large folders.';
+      status.className = 'loading';
+
+      try {
+        const resp = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scans, secrets_path: path }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Scan failed');
+
+        render(data);
+        status.textContent = 'Scan complete.';
+        status.className = 'ok';
+      } catch (err) {
+        status.textContent = 'Error: ' + err.message;
+        status.className = 'err';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    const CATEGORY_LABELS = {
+      secrets: 'Secrets in files',
+      ports:   'Open network ports',
+      config:  'Security configuration',
+      updates: 'Pending updates',
+    };
+
+    function render(r) {
+      const c = r.counts || {};
+      const summary = `
+        <div class="card">
+          <h2>2. Results — ${esc(r.summary_line || '')}</h2>
+          <div class="summary">
+            <div class="stat"><div class="num" style="color: var(--critical)">${c.CRITICAL||0}</div><div class="label">Critical</div></div>
+            <div class="stat"><div class="num" style="color: var(--high)">${c.HIGH||0}</div><div class="label">High</div></div>
+            <div class="stat"><div class="num" style="color: var(--medium)">${c.MEDIUM||0}</div><div class="label">Medium</div></div>
+            <div class="stat"><div class="num" style="color: var(--low)">${c.LOW||0}</div><div class="label">Low</div></div>
+            <div class="stat"><div class="num" style="color: var(--info)">${c.INFO||0}</div><div class="label">Info</div></div>
+          </div>
+        </div>
+      `;
+
+      // Group findings by category preserving the worst-first order within each.
+      const groups = {};
+      for (const f of (r.findings || [])) {
+        (groups[f.category] = groups[f.category] || []).push(f);
+      }
+
+      const sections = (r.ran || []).map(cat => {
+        const list = (groups[cat] || []).map(f => `
+          <div class="finding">
+            <div class="finding-head">
+              <div>
+                <div class="finding-title">${esc(f.title)}</div>
+                <div class="meta">${esc(f.category)} · ${esc(f.id)}</div>
+              </div>
+              <span class="severity ${esc(f.severity)}">${esc(f.severity)}</span>
+            </div>
+            ${f.evidence ? `<div class="evidence">${esc(f.evidence)}</div>` : ''}
+            ${f.remediation ? `<div class="remediation">${esc(f.remediation)}</div>` : ''}
+          </div>
+        `).join('');
+        return `
+          <div class="category">
+            <h3>${esc(CATEGORY_LABELS[cat] || cat)}</h3>
+            ${list || '<div class="meta">No findings.</div>'}
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('results').innerHTML = summary + sections;
+    }
+  </script>
+</body>
+</html>
